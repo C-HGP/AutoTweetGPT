@@ -3,25 +3,29 @@ import requests
 import openai
 import configparser
 import json
+from requests_oauthlib import OAuth1Session
 from time import sleep
+print("Welcome to AutoTweetGPT.")
 
-print('Welcome to AutoTweetGPT.')
-
-print('Reading config...')
+print("Reading config...")
 # Read the config file
 config = configparser.ConfigParser()
 config.read('personalConfig.ini')
-print('Done.')
+print("Done.")
 
-print('Authenticating against TwitterAPI...')
+print("Authenticating against Twitter API...")
 # Set up the Twitter API
-bearer_token = config['Twitter']['bearer_token']
-print('Done.')
+api_key = config['Twitter']['API_key']
+api_key_secret = config['Twitter']['API_key_secret']
+access_token = config['Twitter']['access_token']
+access_token_secret = config['Twitter']['access_token_secret']
+twitter = OAuth1Session(api_key, client_secret=api_key_secret, resource_owner_key=access_token, resource_owner_secret=access_token_secret)
+print("Done.")
 
-print('Authenticating against OpenAI...')
+print("Authenticating against OpenAI API...")
 # Set up the OpenAI API
 openai.api_key = config['OpenAI']['API_key']
-print('Done.')
+print("Done.")
 
 def generate_tweet(prompt, engine, temperature, max_tokens):
     response = openai.Completion.create(
@@ -35,17 +39,11 @@ def generate_tweet(prompt, engine, temperature, max_tokens):
     )
     return response.choices[0].text.strip()
 
-def post_tweet(bearer_token, tweet):
-    headers = {
-        'Authorization': f'Bearer {bearer_token}',
-        'Content-Type': 'application/json',
-    }
-
-    data = {
-        'status': tweet
-    }
-
-    response = requests.post('https://api.twitter.com/2/tweets', headers=headers, data=json.dumps(data))
+def post_tweet(tweet):
+    url = 'https://api.twitter.com/2/tweets'
+    headers = {'Content-Type': 'application/json'}
+    data = {'text': tweet}
+    response = twitter.post(url, headers=headers, data=json.dumps(data))
 
     if response.status_code != 201:
         raise Exception(f'Error posting tweet: {response.text}')
@@ -62,11 +60,15 @@ def main():
     while True:
         try:
             tweet = generate_tweet(prompt, engine, temperature, max_tokens)
-            post_tweet(bearer_token, tweet)
+            if len(tweet) <= 280:
+                post_tweet(tweet)
+            else:
+                print(f"Generated tweet is too long: {tweet}")
             sleep(interval)
         except Exception as e:
             print(f'Error: {e}')
             sleep(interval)
+
 
 if __name__ == '__main__':
     main()
