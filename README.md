@@ -1,4 +1,5 @@
-# [WIP] AutoTweetGPT
+# AutoTweetGPT
+
 AutoTweetGen is a Python script that automates the process of generating and posting tweets using GPT, allowing for easy and efficient content creation on Twitter. With AutoTweetGen, you can generate and post tweets automatically, freeing up time and energy for other tasks.
 
 ## Getting started

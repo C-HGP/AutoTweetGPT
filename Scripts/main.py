@@ -1,36 +1,72 @@
+import os
+import requests
 import openai
-import tweepy
 import configparser
-import time
+import json
+from time import sleep
 
+print('Welcome to AutoTweetGPT.')
+
+print('Reading config...')
+# Read the config file
 config = configparser.ConfigParser()
-config.read('config.ini')
+config.read('personalConfig.ini')
+print('Done.')
 
-# Twitter API keys and access tokens
-auth = tweepy.OAuthHandler(config['Twitter']['consumer_key'], config['Twitter']['consumer_secret'])
-auth.set_access_token(config['Twitter']['access_token'], config['Twitter']['access_token_secret'])
-api = tweepy.API(auth)
+print('Authenticating against TwitterAPI...')
+# Set up the Twitter API
+bearer_token = config['Twitter']['bearer_token']
+print('Done.')
 
-# OpenAI API key and GPT-3 parameters
-openai.api_key = config['OpenAI']['api_key']
-interval = int(config['AutoTweetGen']['interval'])
-temperature = float(config['AutoTweetGen']['temperature'])
-max_tokens = int(config['AutoTweetGen']['max_tokens'])
-engine = config['AutoTweetGen']['engine']
-prompt = config['AutoTweetGen']['prompt']
+print('Authenticating against OpenAI...')
+# Set up the OpenAI API
+openai.api_key = config['OpenAI']['API_key']
+print('Done.')
 
-def generate_tweet():
+def generate_tweet(prompt, engine, temperature, max_tokens):
     response = openai.Completion.create(
         engine=engine,
         prompt=prompt,
+        temperature=temperature,
         max_tokens=max_tokens,
-        temperature=temperature
+        top_p=1,
+        frequency_penalty=0,
+        presence_penalty=0
     )
-    tweet = response.choices[0].text.strip()
-    return tweet
+    return response.choices[0].text.strip()
 
-while True:
-    tweet = generate_tweet()
-    api.update_status(tweet)
-    print('Tweeted:', tweet)
-    time.sleep(interval)
+def post_tweet(bearer_token, tweet):
+    headers = {
+        'Authorization': f'Bearer {bearer_token}',
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        'status': tweet
+    }
+
+    response = requests.post('https://api.twitter.com/2/tweets', headers=headers, data=json.dumps(data))
+
+    if response.status_code != 201:
+        raise Exception(f'Error posting tweet: {response.text}')
+    else:
+        print(f'Tweeted: {tweet}')
+
+def main():
+    interval = int(config['Settings']['interval'])
+    temperature = float(config['Settings']['temperature'])
+    max_tokens = int(config['Settings']['max_tokens'])
+    engine = config['Settings']['engine']
+    prompt = config['Settings']['prompt']
+
+    while True:
+        try:
+            tweet = generate_tweet(prompt, engine, temperature, max_tokens)
+            post_tweet(bearer_token, tweet)
+            sleep(interval)
+        except Exception as e:
+            print(f'Error: {e}')
+            sleep(interval)
+
+if __name__ == '__main__':
+    main()
